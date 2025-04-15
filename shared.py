@@ -1,11 +1,12 @@
-from __future__ import division
-import sys
-import ctypes
 import os
+import sys
 import time
-from subprocess import check_output
-import platform
 import uuid
+import ctypes
+import platform
+import subprocess
+
+from typing import List
 
 _outputStatusLastSize = 0
 _outputStatusDontReplaceLine = False
@@ -15,136 +16,136 @@ class BackupDataError(Exception):
 
 class DDError(Exception):
     pass
-    
+
 class BackupError(Exception):
     pass
-    
+
 class UnimplementedPlatformError(Exception):
     pass
 
 class AverageSpeedCalculator(object):
     """Class for calculating average copy speed of several copy operations"""
-    def __init__(self, maxSamples):
+    def __init__(self, maxSamples: int) -> None:
         self.startTime = None
         self.currentAverageSpeed = None
         self.maxSamples = maxSamples
         self.timingList = []
         self.bytesCopiedList = []
-    
-    def startOfCycle(self):
+
+    def startOfCycle(self) -> None:
         self.startTime = time.time()
-    
-    def endOfCycle(self, bytesCopied):
+
+    def endOfCycle(self, bytesCopied: int) -> None:
         self.timingList.append(time.time()-self.startTime)
         self.bytesCopiedList.append(bytesCopied)
-        self.timingList = self.timingList[-self.maxSamples:] 
+        self.timingList = self.timingList[-self.maxSamples:]
         self.bytesCopiedList = self.bytesCopiedList[-self.maxSamples:]
         self.currentAverageSpeed = sum(self.bytesCopiedList) / sum(self.timingList)
-    
-    def averageSpeed(self):
+
+    def averageSpeed(self) -> float:
         return self.currentAverageSpeed
 
-def outputStatus(str):
+def outputStatus(value: str) -> None:
     """Prints a line to the console that overwrites the previous line, allowing for status updates."""
     if _outputStatusDontReplaceLine:
-        sys.stdout.write(str + '\n')
+        sys.stdout.write(f'{value}\n')
         return
-    
-    global _outputStatusLastSize
-    
-    if len(str) < _outputStatusLastSize:
-        str = str + (' ' * (_outputStatusLastSize-len(str)))
-    
-    sys.stdout.write(str + '\r')
-    sys.stdout.flush()
-    _outputStatusLastSize = len(str)
 
-def humanReadableSize(bytes):
+    global _outputStatusLastSize
+
+    if len(value) < _outputStatusLastSize:
+        value = value + (' ' * (_outputStatusLastSize-len(str)))
+
+    sys.stdout.write(f'{value}\r')
+    sys.stdout.flush()
+    _outputStatusLastSize = len(value)
+
+def humanReadableSize(bytes: int) -> str:
     """Returns a nicer human readable representation of the given size in bytes"""
     if bytes < 1024:
-        return '%db' % bytes
+        return f'{bytes}b'
     elif bytes < (1024*1024):
-        return '%.1fK' % (bytes / 1024)
+        return f'{bytes / 1024:.1f}K'
     elif bytes < (1024*1024*1024):
-        return '%.1fM' % (bytes / (1024*1024))
+        return f'{bytes / (1024*1024):.1f}M'
     else:
-        return '%.1fG' % (bytes / (1024*1024*1024))
+        return f'{bytes / (1024*1024*1024):.1f}G'
 
-def humanReadableSizeToBytes(value):
+def humanReadableSizeToBytes(value: str) -> int:
     """Converts a human readable size value into an exact number of bytes. Uses
     the same format as dd."""
     validSuffixes = {'b':512, 'k':1024, 'm':1048576, 'g':1073741824, 'w':ctypes.sizeof(ctypes.c_int)}
     value = value.lower().strip()
-    
+
     if value[-1] in validSuffixes:
         numberPart = value[:-1]
         suffix = value[-1]
     else:
         numberPart = value
         suffix = None
-    
+
     if numberPart.startswith('0x'):
         number = int(numberPart, 16)
     elif numberPart.startswith('0'):
         number = int(numberPart, 8)
     else:
         number = int(numberPart, 10)
-    
+
     if suffix is None:
         return number
     else:
         return number * validSuffixes[suffix]
 
-def isPartFile(filename):
+def isPartFile(filename: str) -> bool:
     return len(filename) == 13 and filename.startswith('part_') and filename[-8:].isdigit()
 
-def partsInSnapshot(dest):
-    return sorted(filter(isPartFile, os.listdir(dest)))
+def partsInSnapshot(dest: str) -> List[str]:
+    return sorted(list(filter(isPartFile, os.listdir(dest))))
 
-def normalizeUUID(uuidString):
+def normalizeUUID(uuidString: str) -> str:
     return str(uuid.UUID(uuidString)).lower()
 
-def findDiskDeviceIdentifierByUUIDMacOS(uuidString):
+def findDiskDeviceIdentifierByUUIDMacOS(uuidString: str) -> str | None:
     import plistlib
-    
-    diskUtilPlistData = check_output(['diskutil', 'list', '-plist'])
+
+    diskUtilPlistData = subprocess.check_output(['diskutil', 'list', '-plist'])
     diskUtilData = plistlib.readPlistFromString(diskUtilPlistData)
     allDisksAndPartitions = diskUtilData['AllDisksAndPartitions']
-    
+
     def findDiskUUIDInList(partitionList, targetUUIDString):
         for partition in partitionList:
             matches = (('DiskUUID' in partition and partition['DiskUUID'].lower() == targetUUIDString) or
                        ('VolumeUUID' in partition and partition['VolumeUUID'].lower() == targetUUIDString))
             if matches:
                 # Want to provide the unbuffered device identifier for better performance, hence the r
-                return '/dev/r' + partition['DeviceIdentifier']
-        
+                return f'/dev/r{partition['DeviceIdentifier']}'
+
         return None
-    
+
     for data in allDisksAndPartitions:
         if 'Partitions' in data:
             result = findDiskUUIDInList(data['Partitions'], uuidString)
-            
+
             if result is not None:
                 return result
-                
+
         if 'APFSVolumes' in data:
             result = findDiskUUIDInList(data['APFSVolumes'], uuidString)
-            
+
             if result is not None:
                 return result
-    
+
     return None
 
-def findDiskDeviceIdentifierByUUID(uuidString):
+def findDiskDeviceIdentifierByUUID(uuidString: str) -> str | None:
     uuidString = normalizeUUID(uuidString)
-    
+
     if platform.system() == 'Darwin':
         return findDiskDeviceIdentifierByUUIDMacOS(uuidString)
     else:
-        raise UnimplementedPlatformError('Finding a device by UUID is not implemented for platform: %s' % platform.system())
+        raise UnimplementedPlatformError(f'Finding a device by UUID is not implemented for platform: {platform.system()}')
 
-def isUUID(uuidString):
+def isUUID(uuidString: str) -> bool:
     try:
         uuid.UUID(uuidString)
         return True
