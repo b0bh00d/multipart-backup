@@ -7,8 +7,6 @@ import subprocess
 
 import shared
 
-verbose = False
-
 def checkPartsAndGetPartSize(backupPath: str, parts, blockSize: int) -> None:
     """Checks to make sure all the parts in the given backup are a consistent size, and returns that size."""
     backupPartSize = None
@@ -34,20 +32,20 @@ def checkPartsAndGetPartSize(backupPath: str, parts, blockSize: int) -> None:
 
     return backupPartSize
 
-def restore(backupPath: str, dest: str, blockSize: int, startPartIndex: int) -> None:
-    parts = shared.partsInSnapshot(backupPath)
-    backupPartSize = checkPartsAndGetPartSize(backupPath, parts, blockSize)
+def restore(args: argparse.Namespace) -> None:
+    parts = shared.partsInSnapshot(args.backup)
+    backupPartSize = checkPartsAndGetPartSize(args.backup, parts, args.blockSize)
 
     if backupPartSize is None:
         raise shared.BackupDataError('Could not deduce part size... are all of your parts 0 bytes in size?')
 
-    partBlockCount = backupPartSize // blockSize
+    partBlockCount = backupPartSize // args.blockSize
     speedCalculator = shared.AverageSpeedCalculator(5)
 
-    for i in range(startPartIndex, len(parts)):
+    for i in range(args.startPartIndex, len(parts)):
         speedCalculator.startOfCycle()
 
-        partPath = os.path.join(backupPath, parts[i])
+        partPath = os.path.join(args.backup, parts[i])
         partSize = os.stat(partPath).st_size
 
         if speedCalculator.averageSpeed() is not None:
@@ -62,17 +60,17 @@ def restore(backupPath: str, dest: str, blockSize: int, startPartIndex: int) -> 
         else:
             partPathToUse = partPath
 
-        if verbose:
-            p = subprocess.Popen(['dd', 'if=%s' % partPathToUse, 'of=%s' % dest, 'bs=%s' % blockSize, 'count=%s' % partBlockCount,
-                      'oseek=%s' % (i*partBlockCount)])
+        if args.verbose:
+            p = subprocess.Popen(['dd', f'if={partPathToUse}', f'of={args.dest}', f'bs={args.blockSize}', f'count={partBlockCount}',
+                      f'oseek={i * partBlockCount}'])
             p.communicate()
         else:
-            p = subprocess.Popen(['dd', 'if=%s' % partPathToUse, 'of=%s' % dest, 'bs=%s' % blockSize, 'count=%s' % partBlockCount,
-                      'oseek=%s' % (i*partBlockCount)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p = subprocess.Popen(['dd', f'if={partPathToUse}', f'of={args.dest}', f'bs={args.blockSize}', f'count={partBlockCount}',
+                      f'oseek={i * partBlockCount}'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = p.communicate()
 
         if p.returncode != 0:
-            sys.stderr.write(f'dd failed! Output:\n{err}\n')
+            sys.stderr.write(f'dd failed! Output:\n  "{err.decode('utf-8').strip()}"\n')
             raise shared.DDError(f'dd failed on index {i} with status {p.returncode}')
 
         speedCalculator.endOfCycle(partSize)
@@ -80,7 +78,6 @@ def restore(backupPath: str, dest: str, blockSize: int, startPartIndex: int) -> 
     sys.stdout.write("\nRestore completed\n")
 
 def main() -> int:
-    global verbose
     parser = argparse.ArgumentParser(description="Iteratively backup file or device to multi-part file")
     parser.add_argument('backup', help="Folder containing multi-part backup")
     parser.add_argument('dest', help="Destination file or device")
@@ -91,15 +88,17 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        verbose = args.verbose
-        shared._outputStatusDontReplaceLine = verbose
-        startPartIndex = int(args.start)
+        shared._outputStatusDontReplaceLine = args.verbose
 
-        blockSize = shared.humanReadableSizeToBytes(args.block_size)
-        restore(args.backup, args.dest, blockSize, startPartIndex)
+        d = vars(args)
+        d['startPartIndex'] = int(args.start)
+        d['blockSize'] = shared.humanReadableSizeToBytes(args.block_size)
+
+        restore(args)
+
         return 0
     except (shared.DDError, shared.BackupDataError) as e:
-        sys.stderr.write('Error: %s\n' % e.message)
+        sys.stderr.write(f'Error: {e}\n')
         return 1
 
 if __name__ == "__main__":

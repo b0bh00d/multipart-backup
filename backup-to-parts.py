@@ -75,13 +75,13 @@ def copyPartToDisk(source: str, dest: str, partSize: int, blockSize: int, index:
     else:
         shared.outputStatus(f"Copying part {index+1} ...")
 
-    p = subprocess.Popen(['dd', 'if=%s' % source, 'of=%s' % partPath, 'bs=%s' % blockSize,
-               'count=%s' % partBlockCount, 'skip=%s' % (index*partBlockCount)],
+    p = subprocess.Popen(['dd', f'if={source}', f'of={partPath}', f'bs={blockSize}',
+               f'count={partBlockCount}', f'skip={index * partBlockCount}'],
               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = p.communicate()
 
     if p.returncode != 0:
-        sys.stderr.write(f'dd failed! Output:\n{err}\n')
+        sys.stderr.write(f'dd failed! Output:\n  "{err.decode('utf-8').strip()}"\n')
         raise shared.DDError(f'dd failed on index {index} with status {p.returncode}')
 
     newPartSize = os.stat(partPath).st_size
@@ -242,12 +242,13 @@ def deviceIdentifierForSourceString(source: str, sourceIsUUID: bool) -> str | No
     else:
         raise ValueError(f'"{source}" is not a valid device identifier or file')
 
-def backup(sourceString: str, sourceIsUUID: bool, destRoot: str, partSize: int, blockSize: int, keepNullParts: bool, snapshotCount: int) -> None:
-    if partSize % blockSize != 0:
+# def backup(sourceString: str, sourceIsUUID: bool, destRoot: str, partSize: int, blockSize: int, keepNullParts: bool, snapshotCount: int) -> None:
+def backup(args: argparse.Namespace) -> None:
+    if (args.partSize % args.blockSize) != 0:
         raise ValueError('Part size must be integer multiple of block size')
 
-    source = deviceIdentifierForSourceString(sourceString, sourceIsUUID)
-    dest = setupAndReturnDestination(destRoot, snapshotCount)
+    source = deviceIdentifierForSourceString(args.source, args.uuid)
+    dest = setupAndReturnDestination(args.dest, args.snapshots)
     speedCalculator = shared.AverageSpeedCalculator(5)
 
     partIndex = 0
@@ -255,28 +256,28 @@ def backup(sourceString: str, sourceIsUUID: bool, destRoot: str, partSize: int, 
 
     while True:
         speedCalculator.startOfCycle()
-        newPartPath, newPartSize = copyPartToDisk(source, dest, partSize, blockSize, partIndex, speedCalculator)
+        newPartPath, newPartSize = copyPartToDisk(source, dest, args.partSize, args.blockSize, partIndex, speedCalculator)
 
         if newPartPath is None:
             break
 
-        fileChanged = compareNewPart(newPartPath, partSize, blockSize, keepNullParts)
+        fileChanged = compareNewPart(newPartPath, args.partSize, args.blockSize, args.keep_null_parts)
 
         if fileChanged:
             changedFiles += 1
 
         partIndex += 1
-        speedCalculator.endOfCycle(partSize)
+        speedCalculator.endOfCycle(args.partSize)
 
-        if newPartSize != partSize:
+        if newPartSize != args.partSize:
             # We've hit the final part
             break
 
     deletedFiles = removeExcessPartsInDestStartingAtIndex(dest, partIndex)
     renameSnapshotToFinalName(dest)
 
-    if snapshotCount > 0:
-        removeOldSnapshots(destRoot, snapshotCount)
+    if args.snapshots > 0:
+        removeOldSnapshots(args.dest, args.snapshots)
 
     sys.stdout.write("\n")
     sys.stdout.write(f"Finished! Changed files: {changedFiles + deletedFiles}\n")
@@ -296,9 +297,10 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        partSize = shared.humanReadableSizeToBytes(args.part_size)
-        blockSize = shared.humanReadableSizeToBytes(args.block_size)
-        backup(args.source, args.uuid, args.dest, partSize, blockSize, args.keep_null_parts, args.snapshots)
+        d = vars(args)
+        d['partSize'] = shared.humanReadableSizeToBytes(args.part_size)
+        d['blockSize'] = shared.humanReadableSizeToBytes(args.block_size)
+        backup(args)
         return 0
     except (shared.DDError, ValueError, shared.BackupError) as e:
         sys.stderr.write(f'Error: {e}\n')
