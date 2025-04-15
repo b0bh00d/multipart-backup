@@ -1,6 +1,6 @@
 # multipart-backup
 
-A Python script for macOS and (theoretically) Linux that utilizes `dd` to create incremental backups of entire partitions, regardless of their contents or filesystem.
+A Python script for macOS and Linux that utilizes `dd` to create incremental backups of entire partitions, regardless of their contents or filesystem.
 
 For example, after backing up a 1 GB partition into 100 MB chunks, the folder containing the backup may look like this:
 
@@ -22,7 +22,7 @@ The script can also optionally be used to create snapshots, where each backup is
 
 ### Requirements:
 
-- Python 2.7 (Currently untested in Python 3)
+- Python 3.x (tested with 3.12.3)
 - `dd` is installed and in your PATH.
 
 ### Usage for backing up:

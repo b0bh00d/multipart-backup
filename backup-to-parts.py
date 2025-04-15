@@ -177,7 +177,7 @@ def setupAndReturnDestination(destRoot: str, snapshotCount: int) -> str:
     """If snapshotCount > 0, either returns a new snapshot containing hard links to the previous snapshot's parts, or
     returns an existing in-progress snapshot. If snapshotCount is 0, then returns destRoot."""
     if not os.path.exists(destRoot):
-        os.mkdir(destRoot)
+        os.makedirs(destRoot, exist_ok=True)
 
     if snapshotCount > 0:
         prevs = previousSnapshots(destRoot)
