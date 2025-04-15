@@ -105,6 +105,42 @@ def partsInSnapshot(dest: str) -> List[str]:
 def normalizeUUID(uuidString: str) -> str:
     return str(uuid.UUID(uuidString)).lower()
 
+def deviceIdentifierForSourceString(source: str, sourceIsUUID: bool) -> str | None:
+    if sourceIsUUID:
+        result = findDiskDeviceIdentifierByUUID(source)
+
+        if result is None:
+            raise ValueError(f'Could not find a partition with UUID: {source}')
+
+        return result
+
+    elif os.path.exists(source):
+        return source
+    else:
+        raise ValueError(f'"{source}" is not a valid device identifier or file')
+
+def findDiskDeviceIdentifierByUUIDLinux(uuidString: str) -> str | None:
+    # https://stackoverflow.com/questions/5080402/python-subprocess-module-how-do-i-give-input-to-the-first-of-series-of-piped-co
+    import threading
+
+    first = subprocess.Popen(['blkid'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    second = subprocess.Popen(['grep', uuidString], stdin=first.stdout, stdout=subprocess.PIPE)
+    first.stdout.close()
+    first.stdout = None
+
+    threading.Thread(target=first.communicate).start()
+
+    # get output from the second command at the same time
+    output = second.communicate()[0].decode('utf-8').strip()
+    if len(output):
+        device, artrib = output.split(':')
+        return device
+        # options = artrib.split()
+        # print(device)
+        # print(options)
+
+    return None
+
 def findDiskDeviceIdentifierByUUIDMacOS(uuidString: str) -> str | None:
     import plistlib
 
@@ -140,10 +176,13 @@ def findDiskDeviceIdentifierByUUIDMacOS(uuidString: str) -> str | None:
 def findDiskDeviceIdentifierByUUID(uuidString: str) -> str | None:
     uuidString = normalizeUUID(uuidString)
 
-    if platform.system() == 'Darwin':
-        return findDiskDeviceIdentifierByUUIDMacOS(uuidString)
-    else:
-        raise UnimplementedPlatformError(f'Finding a device by UUID is not implemented for platform: {platform.system()}')
+    match platform.system():
+        case 'Darwin':
+            return findDiskDeviceIdentifierByUUIDMacOS(uuidString)
+        case 'Linux':
+            return findDiskDeviceIdentifierByUUIDLinux(uuidString)
+        case _:
+            raise UnimplementedPlatformError(f'Finding a device by UUID is not implemented for platform: {platform.system()}')
 
 def isUUID(uuidString: str) -> bool:
     try:

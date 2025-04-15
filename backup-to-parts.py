@@ -228,26 +228,11 @@ def removeOldSnapshots(destRoot: str, snapshotCount: int) -> None:
 def renameSnapshotToFinalName(dest: str) -> None:
     os.rename(dest, os.path.join(os.path.dirname(dest), snapshotTimestamp()))
 
-def deviceIdentifierForSourceString(source: str, sourceIsUUID: bool) -> str | None:
-    if sourceIsUUID:
-        result = shared.findDiskDeviceIdentifierByUUID(source)
-
-        if result is None:
-            raise ValueError(f'Could not find a partition with UUID: {source}')
-
-        return result
-
-    elif os.path.exists(source):
-        return source
-    else:
-        raise ValueError(f'"{source}" is not a valid device identifier or file')
-
-# def backup(sourceString: str, sourceIsUUID: bool, destRoot: str, partSize: int, blockSize: int, keepNullParts: bool, snapshotCount: int) -> None:
 def backup(args: argparse.Namespace) -> None:
     if (args.partSize % args.blockSize) != 0:
         raise ValueError('Part size must be integer multiple of block size')
 
-    source = deviceIdentifierForSourceString(args.source, args.uuid)
+    source = shared.deviceIdentifierForSourceString(args.source, args.uuid)
     dest = setupAndReturnDestination(args.dest, args.snapshots)
     speedCalculator = shared.AverageSpeedCalculator(5)
 

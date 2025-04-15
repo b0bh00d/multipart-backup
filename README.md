@@ -34,23 +34,23 @@ The script can also optionally be used to create snapshots, where each backup is
 
 * backup-root: the path to the folder that will contain the backup
 
-* `-bs SIZE` `--block-size SIZE`    
+* `-bs SIZE` `--block-size SIZE`
 Block size used with `dd` and when comparing files. Defaults to 1 MB.
 
-* `-ps SIZE` `--part-size SIZE`:    
+* `-ps SIZE` `--part-size SIZE`:
 The size of the parts the source file or device is split into. Defaults to 100 MB.
 
-* `-k` `--keep-null-parts`:    
+* `-k` `--keep-null-parts`:
 The default behavior is any part of the backup that contains no data other than null bytes (zero) are represented by 0 bytes files. When this is used, all parts are kept at full size.
 
-* `-s COUNT` `--snapshots COUNT`    
+* `-s COUNT` `--snapshots COUNT`
 Specifies how many snapshots are kept in the backup root. When set to 1 or higher, the script will create the snapshot folders in the backup root named with a timestamp. When set to 0, no snapshots are made and the backup root just contains all of the parts. The default is 4.
 
-* `-u` `--uuid`    
+* `-u` `--uuid`
 Specifies that source is a partition UUID rather than a file or device identifier.
 
-* `-h` `--help`    
-Displays usage information 
+* `-h` `--help`
+Displays usage information
 
 ##### Example:
 
@@ -59,19 +59,22 @@ Displays usage information
 ### Usage for restoring:
 
     restore-from-parts.py [-h] [-bs BLOCK_SIZE] [-s START] [-v] snapshot-path destination
-    
+
 * snapshot-path: path to a folder containing all of the parts of a backup. When `-s` is non-zero when creating the backup, this is the path to a particular snapshot, otherwise it's the path to the backup root itself.
 
 * destination: the file or device to restore onto, e.g. `/dev/rdisk1s2` or `/dev/sda2`
 
-* `-bs SIZE` `--block-size SIZE`    
+* `-bs SIZE` `--block-size SIZE`
 Block size used with `dd`. Defaults to 1 MB.
 
-* `-s START` `--start START`    
+* `-s START` `--start START`
 Index of the part to start with when writing to the destination. The part is still written to the correct point on the drive as though restoration started with the first part. Useful to resume a restoration that has been stopped partway through.
 
-* `-h` `--help`    
-Displays usage information 
+* `-u` `--uuid`
+Specifies that destination is a partition UUID rather than a file or device identifier.
+
+* `-h` `--help`
+Displays usage information
 
 ##### Example:
 
@@ -99,12 +102,6 @@ So I figured that if I could split that huge backup into multiple parts and then
 Maybe it will be of use to someone else!
 
 ### Issues and future work
-
-- Specifying partition UUID doesn't work in Linux
-
-- Doesn't yet have a way to restore to a partition by UUID, but probably will eventually.
-
-- Not sure if it's Python 3 compatible, but I may go out of my way to ensure that in the future.
 
 - There's no progress indicator other than how many parts have been copied
 

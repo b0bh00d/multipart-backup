@@ -33,6 +33,8 @@ def checkPartsAndGetPartSize(backupPath: str, parts, blockSize: int) -> None:
     return backupPartSize
 
 def restore(args: argparse.Namespace) -> None:
+    dest = shared.deviceIdentifierForSourceString(args.dest, args.uuid)
+
     parts = shared.partsInSnapshot(args.backup)
     backupPartSize = checkPartsAndGetPartSize(args.backup, parts, args.blockSize)
 
@@ -61,11 +63,11 @@ def restore(args: argparse.Namespace) -> None:
             partPathToUse = partPath
 
         if args.verbose:
-            p = subprocess.Popen(['dd', f'if={partPathToUse}', f'of={args.dest}', f'bs={args.blockSize}', f'count={partBlockCount}',
+            p = subprocess.Popen(['dd', f'if={partPathToUse}', f'of={dest}', f'bs={args.blockSize}', f'count={partBlockCount}',
                       f'oseek={i * partBlockCount}'])
             p.communicate()
         else:
-            p = subprocess.Popen(['dd', f'if={partPathToUse}', f'of={args.dest}', f'bs={args.blockSize}', f'count={partBlockCount}',
+            p = subprocess.Popen(['dd', f'if={partPathToUse}', f'of={dest}', f'bs={args.blockSize}', f'count={partBlockCount}',
                       f'oseek={i * partBlockCount}'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = p.communicate()
 
@@ -85,6 +87,7 @@ def main() -> int:
                         'as dd. Defaults to 1MB.', type=str, default=str(1024*1024))
     parser.add_argument('-s', '--start', help='Index of starting part', type=str, default=str(0))
     parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('-u', '--uuid', help='Indicates destination is a partition UUID', action='store_true')
     args = parser.parse_args()
 
     try:
