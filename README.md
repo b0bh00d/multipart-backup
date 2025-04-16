@@ -28,7 +28,8 @@ The script can also optionally be used to create snapshots, where each backup is
 ### Usage for backing up:
 
     backup-to-parts.py [-h] [-bs BLOCK_SIZE] [-ps PART_SIZE] [-k]
-                       [-s SNAPSHOTS] [-u] source backup-root
+                       [-s SNAPSHOTS] [-u] [-l] [-f PASSPHRASE]
+                       [-o PASSPHRASE] source backup-root
 
 * source: the file or device to backup, e.g. `/dev/rdisk1s2` or `/dev/sda2`. Can also be a partition UUID when `-u` is specified.
 
@@ -41,13 +42,24 @@ Block size used with `dd` and when comparing files. Defaults to 1 MB.
 The size of the parts the source file or device is split into. Defaults to 100 MB.
 
 * `-k` `--keep-null-parts`:
-The default behavior is any part of the backup that contains no data other than null bytes (zero) are represented by 0 bytes files. When this is used, all parts are kept at full size.
+The default behavior is any part of the backup that contains no data other than null bytes (zero) are represented by 0 bytes files. When this is used, all parts are kept at full size.  Note that this option is required when creating a one-off encrypted or obfuscated backup.
 
 * `-s COUNT` `--snapshots COUNT`
 Specifies how many snapshots are kept in the backup root. When set to 1 or higher, the script will create the snapshot folders in the backup root named with a timestamp. When set to 0, no snapshots are made and the backup root just contains all of the parts. The default is 4.
 
+* `-f PASSPHRASE` `--fernet PASSPHRASE`
+This option will create a backup of the source that is encrypted using the Fernet algorithm (from the [cryptography](https://pypi.org/search/?q=cryptography) package).  This backup will have each of its parts encrypted using the provided passphrase.<br><br>
+Encrypted snapshots are consdiered "one-offs", and do not participate in incremental backups.  The program will detect these snapshots during incremental backups, and simply bypass them.
+
+* `-o PASSPHRASE` `--obfuscate PASSPHRASE`
+Backups can be obfuscated using a custom algorithm instead of encrypted with something more formal.  Unlike backups encrypted with traditional algorithms, obfuscation guarantees a 1:1 byte pattern and size footprint with the source partition.  Potential advantages to this are documented in the code.<br><br>
+As with encrypted snapshots, obfuscated snapshorts are also consdiered "one-offs", and do not participate in incremental backups.  The program will detect these snapshots during incremental backups, and ignore them.
+
 * `-u` `--uuid`
 Specifies that source is a partition UUID rather than a file or device identifier.
+
+* `-l` `--symlink`
+Use soft links (i.e. symlinks) instead of hard links for incremental backups.
 
 * `-h` `--help`
 Displays usage information
@@ -58,7 +70,8 @@ Displays usage information
 
 ### Usage for restoring:
 
-    restore-from-parts.py [-h] [-bs BLOCK_SIZE] [-s START] [-v] snapshot-path destination
+    restore-from-parts.py [-h] [-bs BLOCK_SIZE] [-s START] [-v] [-u]
+                       [-f PASSPHRASE] [-o PASSPHRASE] snapshot-path destination
 
 * snapshot-path: path to a folder containing all of the parts of a backup. When `-s` is non-zero when creating the backup, this is the path to a particular snapshot, otherwise it's the path to the backup root itself.
 
@@ -69,6 +82,13 @@ Block size used with `dd`. Defaults to 1 MB.
 
 * `-s START` `--start START`
 Index of the part to start with when writing to the destination. The part is still written to the correct point on the drive as though restoration started with the first part. Useful to resume a restoration that has been stopped partway through.
+
+* `-f PASSPHRASE` `--fernet PASSPHRASE`
+Restore a snapshot previously encrypted using Fernet.  This option is required if you point the program at a snapshot folder that has detectable encrypted parts.
+
+* `-c PASSPHRASE` `--clarify PASSPHRASE`
+Restore a snapshot previously obfuscated.<br><br>
+This option is _not_ required if you point the program at a snapshot folder that has detectable obfuscated parts.  Providing the passphrase will restore the partition to a state identical to a regular backup.  However, if you point the program at an obfuscated folder _without_ providing a passphrase, the program will "restore" the obfuscated binary data to the partition as-is without warning or complaint.  Your partition will not be directly usable (or even perhaps accessible).  See the code for the `Recast.obfuscate()` method for a more detailed description about this tactic.
 
 * `-u` `--uuid`
 Specifies that destination is a partition UUID rather than a file or device identifier.
@@ -90,18 +110,13 @@ It's much faster to specify a disk using `/dev/rdisk` rather than `/dev/disk`. T
 
 > `/dev/rdisk` nodes are character-special devices, but are "raw" in the BSD sense and force block-aligned I/O. They are closer to the physical disk than the buffer cache. `/dev/disk` nodes, on the other hand, are buffered block-special devices and are used primarily by the kernel's filesystem code.
 
-
 ### Why this exists
 
-I spent a great many hours setting up an external drive for my mac containing several partitions with different operating systems on them. It took a lot of work both to get the systems set up the way I wanted and to get all of their bootloaders set up correctly on the EFI partition. While my mac's main drive is backed up regularly by Time Machine and my choice of online backup service, I didn't have a good plan on how to back up these other systems, especially given that I've encrypted their filesystems.
-
-It's important to me that I be able to restore those systems to a fully working and bootable state should the need arise, so I eventually decided I wanted to dump the contents of their partitions to my backup disk. The trouble was that a huge file that's hundreds of gigabytes in size is inefficient, and also will wreck havoc when processed by my online backup software -- a file that size would take a week to upload with my current internet connection! I could just exclude it from the online backup, but I've learned from experience that having an on-site and off-site backup of my data is *really* important.
-
-So I figured that if I could split that huge backup into multiple parts and then incrementally update it, then the online backup would only upload the parts of that backup that have changed, solving the problem. Furthermore, since a lot of sections of these partitions is still blank, I figured I could avoid backing up that data. But I wasn't aware of any software that exists to do that. And slapping something together in Python that accomplishes this with `dd` didn't seem to daunting. So I went ahead and did it.
-
-Maybe it will be of use to someone else!
+(see the [README in the original repository](https://github.com/briankendall/multipart-backup) for a detailed narrative as to why Brian created this.)
 
 ### Issues and future work
+
+- Selecting symlinks instead of hard links will break snapshot rolling at the moment.
 
 - There's no progress indicator other than how many parts have been copied
 

@@ -8,6 +8,7 @@ import argparse
 import subprocess
 
 import shared
+from recaster import Recaster
 
 from typing import Tuple, List
 
@@ -64,7 +65,7 @@ def newPartPathAtIndex(dest: str, index: int) -> str:
     yet been compared to an existing part to see if they're identical or if the new part contains all zeros"""
     return os.path.join(dest, f'part_{index:08d}.new')
 
-def copyPartToDisk(source: str, dest: str, partSize: int, blockSize: int, index: int, speedCalculator) -> Tuple[str | None, int]:
+def copyPartToDisk(source: str, dest: str, partSize: int, blockSize: int, index: int, speedCalculator: shared.AverageSpeedCalculator) -> Tuple[str | None, int]:
     """Copies source into dest in partSize chunks. Returns the path of the newly created part, or None if the part
     was within partSize-1 bytes of the end of source and there are no more parts to copy."""
     partBlockCount = partSize // blockSize
@@ -98,14 +99,12 @@ def compareNewPart(newPartPath: str, partSize: int, blockSize: int, keepNullPart
     """Compares a freshly completed part to the previously existing part (if one exists) as well as checking
     if the part is all zeros"""
     def areOldAndNewPartsIdentical(prevPartPath, newPartPath, newPartIsAllZeros):
-        newPartSize = os.stat(newPartPath).st_size
         prevPartSize = os.stat(prevPartPath).st_size
 
         if not keepNullParts and prevPartSize == 0 and newPartIsAllZeros:
             return True
-        else:
-            result = areFilesIdentical(prevPartPath, newPartPath, blockSize)
-            return result
+
+        return areFilesIdentical(prevPartPath, newPartPath, blockSize)
 
     newPartIsAllZeros = isFileAllZeros(newPartPath, blockSize)
     prevPartPath = os.path.splitext(newPartPath)[0]
@@ -144,15 +143,30 @@ def snapshotTimestamp() -> str:
 def inProgressSnapshotName() -> str:
     return 'snapshot-inprogress'
 
-def isSnapshotDir(dirName: str) -> bool:
-    return (dirName == inProgressSnapshotName() or
-            re.search(r"^snapshot-\d{4}-\d{2}-\d{2}-\d{6}", dirName) is not None)
+def isSnapshotDir(path: str) -> bool:
+    dirName = os.path.basename(path)
+    partName = partPathAtIndex(path, 0)
+    return ((dirName == inProgressSnapshotName()
+            or re.search(r"^snapshot-\d{4}-\d{2}-\d{2}-\d{6}", dirName) is not None)
+            # filter out snapshots that have obfuscation or encrypted files
+            and os.path.exists(partName))
 
 def previousSnapshots(destRoot: str) -> List[str]:
-    return list(map(lambda x: os.path.join(destRoot, x),
-               sorted(list(filter(isSnapshotDir,os.listdir(destRoot))))))
+    return list(
+            map(lambda x: os.path.join(destRoot, x),
+               sorted(
+                   list(
+                       filter(isSnapshotDir,
+                            map(lambda x: os.path.join(destRoot, x),
+                                os.listdir(destRoot)
+                            )
+                        )
+                    )
+                )
+            )
+        )
 
-def findIncompleteSnapshot(snapshots):
+def findIncompleteSnapshot(snapshots: List[str]):
     incompletes = list(filter(lambda x: os.path.basename(x) == inProgressSnapshotName(), snapshots))
 
     if len(incompletes) > 0:
@@ -165,15 +179,16 @@ def createNewSnapshot(destRoot: str) -> str:
     os.mkdir(dest)
     return dest
 
-def createNewSnapshotWithLinksToOld(destRoot: str, lastSnapshot) -> str:
+def createNewSnapshotWithLinksToOld(destRoot: str, lastSnapshot: str, useSymLinks: bool = False) -> str:
     dest = createNewSnapshot(destRoot)
+    link = os.symlink if useSymLinks else os.link
 
     for part in shared.partsInSnapshot(lastSnapshot):
-        os.link(os.path.join(lastSnapshot, part), os.path.join(dest, part))
+        link(os.path.join(lastSnapshot, part), os.path.join(dest, part))
 
     return dest
 
-def setupAndReturnDestination(destRoot: str, snapshotCount: int) -> str:
+def setupAndReturnDestination(destRoot: str, snapshotCount: int, incrBackup: bool = True, useSymLinks: bool = False) -> str:
     """If snapshotCount > 0, either returns a new snapshot containing hard links to the previous snapshot's parts, or
     returns an existing in-progress snapshot. If snapshotCount is 0, then returns destRoot."""
     if not os.path.exists(destRoot):
@@ -184,12 +199,16 @@ def setupAndReturnDestination(destRoot: str, snapshotCount: int) -> str:
         incompleteSnapshot = findIncompleteSnapshot(prevs)
 
         if incompleteSnapshot is not None:
-            sys.stdout.write("NOTE: last snapshot is complete! Will attempt to "
+            sys.stdout.write("NOTE: last snapshot is not complete! Will attempt to "
                              "finish it...\n")
             dest = incompleteSnapshot
         elif len(prevs) > 0:
             sys.stdout.write("Setting up new snapshot...\n")
-            dest = createNewSnapshotWithLinksToOld(destRoot, prevs[-1])
+            if incrBackup:
+                dest = createNewSnapshotWithLinksToOld(destRoot, prevs[-1], useSymLinks)
+            else:
+                # we're creating a one-off backup
+                dest = createNewSnapshot(destRoot)
         else:
             dest = createNewSnapshot(destRoot)
     else:
@@ -225,16 +244,20 @@ def removeOldSnapshots(destRoot: str, snapshotCount: int) -> None:
 
             removeEmptyDirectoryEvenIfItHasAnAnnoyingDSStoreFileInIt(oldSnapshot)
 
-def renameSnapshotToFinalName(dest: str) -> None:
-    os.rename(dest, os.path.join(os.path.dirname(dest), snapshotTimestamp()))
+def renameSnapshotToFinalName(dest: str) -> str:
+    final_name = os.path.join(os.path.dirname(dest), snapshotTimestamp())
+    os.rename(dest, final_name)
+    return final_name
 
 def backup(args: argparse.Namespace) -> None:
     if (args.partSize % args.blockSize) != 0:
         raise ValueError('Part size must be integer multiple of block size')
 
+    incrBackup = (not args.fernet) and (not args.obfuscate)
     source = shared.deviceIdentifierForSourceString(args.source, args.uuid)
-    dest = setupAndReturnDestination(args.dest, args.snapshots)
+    dest = setupAndReturnDestination(args.dest, args.snapshots, incrBackup, args.symlink)
     speedCalculator = shared.AverageSpeedCalculator(5)
+    recaster = Recaster(args.obfuscate if args.obfuscate else args.fernet)
 
     partIndex = 0
     changedFiles = 0
@@ -246,10 +269,15 @@ def backup(args: argparse.Namespace) -> None:
         if newPartPath is None:
             break
 
-        fileChanged = compareNewPart(newPartPath, args.partSize, args.blockSize, args.keep_null_parts)
+        if args.fernet:
+            recaster.encrypt(newPartPath)
+        elif args.obfuscate:
+            recaster.obfuscate(newPartPath)
+        else:
+            fileChanged = compareNewPart(newPartPath, args.partSize, args.blockSize, args.keep_null_parts)
 
-        if fileChanged:
-            changedFiles += 1
+            if fileChanged:
+                changedFiles += 1
 
         partIndex += 1
         speedCalculator.endOfCycle(args.partSize)
@@ -259,18 +287,26 @@ def backup(args: argparse.Namespace) -> None:
             break
 
     deletedFiles = removeExcessPartsInDestStartingAtIndex(dest, partIndex)
-    renameSnapshotToFinalName(dest)
+    dest = renameSnapshotToFinalName(dest)
 
     if args.snapshots > 0:
         removeOldSnapshots(args.dest, args.snapshots)
 
-    sys.stdout.write("\n")
-    sys.stdout.write(f"Finished! Changed files: {changedFiles + deletedFiles}\n")
+    sys.stdout.write("\nFinished! ")
+    if args.fernet:
+        sys.stdout.write(f"{partIndex} new encrypted")
+    elif args.obfuscate:
+        sys.stdout.write(f"{partIndex} new obfuscated")
+    else:
+        sys.stdout.write(f"{changedFiles + deletedFiles} changed")
+    sys.stdout.write(f" files in {dest}.\n")
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Iteratively backup file or device to multi-part file")
     parser.add_argument('source', help="Source file, device identifier, or partition UUID")
     parser.add_argument('dest', help="Destination folder for multi-part backup")
+    parser.add_argument('-f', '--fernet', help='Passphrase for encrypting backups using Fernet.', type=str, default=None)
+    parser.add_argument('-o', '--obfuscate', help='Passphrase for encrypting backups using an obfuscation algorithm.', type=str, default=None)
     parser.add_argument('-bs', '--block-size', help='Block size for dd and comparing files. Uses same format for sizes '
                         'as dd. Defaults to 1 MB.', type=str, default=str(1024*1024))
     parser.add_argument('-ps', '--part-size', help='Size of each part of the backup. Uses same format for sizes as dd. '
@@ -279,7 +315,12 @@ def main() -> int:
                         action='store_true')
     parser.add_argument('-s', '--snapshots', type=int, default=4, help='Number of snapshots to maintain. Default is 4.')
     parser.add_argument('-u', '--uuid', help='Indicates source is a partition UUID', action='store_true')
+    parser.add_argument('-l', '--symlink', help='Use soft links instead of hard links for incremental backups', action='store_true')
     args = parser.parse_args()
+
+    if ((args.fernet is not None) or ((args.obfuscate is not None))) and (not args.keep_null_parts):
+        sys.stderr.write("Error: Encryption requires 'keep-null-parts' to be enabled\n")
+        sys.exit(1)
 
     try:
         d = vars(args)

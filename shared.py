@@ -23,7 +23,7 @@ class BackupError(Exception):
 class UnimplementedPlatformError(Exception):
     pass
 
-class AverageSpeedCalculator(object):
+class AverageSpeedCalculator():
     """Class for calculating average copy speed of several copy operations"""
     def __init__(self, maxSamples: int) -> None:
         self.startTime = None
@@ -99,8 +99,22 @@ def humanReadableSizeToBytes(value: str) -> int:
 def isPartFile(filename: str) -> bool:
     return len(filename) == 13 and filename.startswith('part_') and filename[-8:].isdigit()
 
-def partsInSnapshot(dest: str) -> List[str]:
-    return sorted(list(filter(isPartFile, os.listdir(dest))))
+def isEncryptedFile(filename: str) -> bool:
+    return filename.endswith('.enc') and filename[-12:-8].isdigit()
+
+def isObfuscatedFile(filename: str) -> bool:
+    return filename.endswith('.obf') and filename[-12:-8].isdigit()
+
+def partsInSnapshot(dest: str, variant: str = None) -> List[str]:
+    match variant:
+        case None:
+            return sorted(list(filter(isPartFile, os.listdir(dest))))
+        case 'encrypted':
+            return sorted(list(filter(isEncryptedFile, os.listdir(dest))))
+        case 'obfuscated':
+            return sorted(list(filter(isObfuscatedFile, os.listdir(dest))))
+
+    return []
 
 def normalizeUUID(uuidString: str) -> str:
     return str(uuid.UUID(uuidString)).lower()
