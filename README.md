@@ -53,7 +53,7 @@ Encrypted snapshots are consdiered "one-offs", and do not participate in increme
 
 * `-o PASSPHRASE` `--obfuscate PASSPHRASE`
 Backups can be obfuscated using a custom algorithm instead of encrypted with something more formal.  Unlike backups encrypted with traditional algorithms, obfuscation guarantees a 1:1 byte pattern and size footprint with the source partition.  Potential advantages to this are documented in the code.<br><br>
-As with encrypted snapshots, obfuscated snapshorts are also consdiered "one-offs", and do not participate in incremental backups.  The program will detect these snapshots during incremental backups, and ignore them.
+As with encrypted snapshots, obfuscated snapshots are also considered "one-offs", and do not participate in incremental backups.  The program will detect these snapshots during incremental backups, and ignore them.
 
 * `-u` `--uuid`
 Specifies that source is a partition UUID rather than a file or device identifier.
