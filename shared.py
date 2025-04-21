@@ -54,7 +54,7 @@ def outputStatus(value: str) -> None:
     global _outputStatusLastSize
 
     if len(value) < _outputStatusLastSize:
-        value = value + (' ' * (_outputStatusLastSize-len(str)))
+        value = value + (' ' * (_outputStatusLastSize-len(value)))
 
     sys.stdout.write(f'{value}\r')
     sys.stdout.flush()
