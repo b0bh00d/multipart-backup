@@ -37,7 +37,7 @@ def checkPartsAndGetPartSize(backupPath: str, parts: List[str], blockSize: int) 
 
 def restore(args: argparse.Namespace) -> None:
     dest = shared.deviceIdentifierForSourceString(args.dest, args.uuid)
-    recaster = Recaster(args.clarify if args.clarify else args.fernet)
+    recaster = Recaster(args.clarify if args.clarify else args.fernet, hashlvl=args.hash)
 
     reconstitute = None
     parts = shared.partsInSnapshot(args.backup)
@@ -118,17 +118,24 @@ def restore(args: argparse.Namespace) -> None:
     sys.stdout.write("\nRestore completed\n")
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Iteratively backup file or device to multi-part file")
+    parser = argparse.ArgumentParser(
+        description="Iteratively backup file or device to multi-part file",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('backup', help="Folder containing multi-part backup")
     parser.add_argument('dest', help="Destination file or device")
     parser.add_argument('-f', '--fernet', help='Passphrase for decrypting backups using Fernet.', type=str, default=None)
     parser.add_argument('-c', '--clarify', help='Passphrase for clarifying backups using an obfuscation algorithm.', type=str, default=None)
     parser.add_argument('-bs', '--block-size', help='Block size for dd and comparing files. Uses same format for sizes '
                         'as dd. Defaults to 1MB.', type=str, default=str(1024*1024))
+    parser.add_argument('-H', '--hash', type=int, default=256, help='SHA hash level to use (1, 256, 384, 512).')
     parser.add_argument('-s', '--start', help='Index of starting part', type=str, default=str(0))
     parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-u', '--uuid', help='Indicates destination is a partition UUID', action='store_true')
     args = parser.parse_args()
+
+    if args.hash not in [1, 256, 384, 512]:
+        sys.stderr.write("Error: Hash level must be one of 1, 256, 384, or 512.\n")
+        sys.exit(1)
 
     try:
         shared._outputStatusDontReplaceLine = args.verbose

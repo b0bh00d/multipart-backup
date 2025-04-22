@@ -257,7 +257,7 @@ def backup(args: argparse.Namespace) -> None:
     source = shared.deviceIdentifierForSourceString(args.source, args.uuid)
     dest = setupAndReturnDestination(args.dest, args.snapshots, incrBackup, args.symlink)
     speedCalculator = shared.AverageSpeedCalculator(5)
-    recaster = Recaster(args.obfuscate if args.obfuscate else args.fernet)
+    recaster = Recaster(args.obfuscate if args.obfuscate else args.fernet, hashlvl=args.hash)
 
     partIndex = 0
     changedFiles = 0
@@ -302,7 +302,9 @@ def backup(args: argparse.Namespace) -> None:
     sys.stdout.write(f" files in {dest}.\n")
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Iteratively backup file or device to multi-part file")
+    parser = argparse.ArgumentParser(
+        description="Iteratively backup file or device to multi-part file",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('source', help="Source file, device identifier, or partition UUID")
     parser.add_argument('dest', help="Destination folder for multi-part backup")
     parser.add_argument('-f', '--fernet', help='Passphrase for encrypting backups using Fernet.', type=str, default=None)
@@ -314,12 +316,17 @@ def main() -> int:
     parser.add_argument('-k', '--keep-null-parts', help='Keep parts that contain all zeros at full size',
                         action='store_true')
     parser.add_argument('-s', '--snapshots', type=int, default=4, help='Number of snapshots to maintain. Default is 4.')
+    parser.add_argument('-H', '--hash', type=int, default=256, help='SHA hash level to use (1, 256, 384, 512).')
     parser.add_argument('-u', '--uuid', help='Indicates source is a partition UUID', action='store_true')
     parser.add_argument('-l', '--symlink', help='Use soft links instead of hard links for incremental backups', action='store_true')
     args = parser.parse_args()
 
     if ((args.fernet is not None) or ((args.obfuscate is not None))) and (not args.keep_null_parts):
         sys.stderr.write("Error: Encryption requires 'keep-null-parts' to be enabled\n")
+        sys.exit(1)
+
+    if args.hash not in [1, 256, 384, 512]:
+        sys.stderr.write("Error: Hash level must be one of 1, 256, 384, or 512.\n")
         sys.exit(1)
 
     try:

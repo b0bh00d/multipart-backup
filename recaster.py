@@ -4,13 +4,28 @@ import base64
 import hashlib
 
 from typing import List
+from collections.abc import Callable
 
 class Recaster():
-    def __init__(self, passphrase: str | None = None):
+    def __init__(self, hashlvl: int, passphrase: str | None = None):
         if passphrase:
             # the hashObj is derived from the provided passphrase
             self.passphrase = passphrase.encode('utf-8')
-            self.hashObj = hashlib.sha1(self.passphrase)
+
+            self.hasher: Callable[[bytes], bytes] = None
+            match hashlvl:
+                case 1:
+                    self.hasher = hashlib.sha1
+                case 256:
+                    self.hasher = hashlib.sha256
+                case 384:
+                    self.hasher = hashlib.sha384
+                case 512:
+                    self.hasher = hashlib.sha512
+                case _:
+                    raise Exception(f"Hash level {hashlvl} is not supported!")
+
+            self.hashObj = self.hasher(self.passphrase)
 
     def encrypt(self, chunkPath: str) -> bool:
         """
@@ -103,14 +118,22 @@ class Recaster():
         Steps to obfuscate a partition:
         1. Backup your partition using the "obfuscate" option.
         2. Immediately perform a "restore" of that snapshot (WITHOUT using "clarify") to the same partition.
-          2a. Delete your backup files (the exact same data is contained in the partition).
+          2a. If you can be reasonably assured that nothing will happen to the data you just restored,
+              you can delete your backup files--the exact same data is now contained in the partition.
 
         Steps to recover an obfuscated partition:
-        1. Backup your partition (WITHOUT using "obfuscation"; i.e., standard backup).
-        2. Immediately perform a "restore" of that snapshot using the "clarify" option.
+        1. Backup your partition (WITHOUT using "obfuscation"; i.e., a standard snapshot backup).
+        2. Immediately perform a "restore" of that snapshot using the "clarify" option, using the same
+           passphrase (and hash level) you used to originally back it up in obfuscation mode.
 
         Once you've resonstituted the obfuscated data to your partition using the "clarify" option,
-        your partition is once again in a functional, humanly usable state.
+        your partition is once again in a functional, humanly usable state.  I have personally tested
+        this process, even gonig so far as to obfuscate my "EFI" partition, with accurate recovery.
+
+        In any case, MAKE SURE YOU HAVE BACKUPS OF YOUR DATA.  If you misstep, it's entirely
+        possible you can render things irretrievable.
+
+        Protege te.
         """
         import concurrent.futures
 
@@ -122,7 +145,7 @@ class Recaster():
         # creating a rolling-chain key where each stand-alone chunk cannot (hope
         # to) be recovered without information calculated from the preceeding chunks in
         # the same order they were processed.
-        nextHash = hashlib.sha1(data).digest()
+        nextHash = self.hasher(data).digest()
 
         # run a thread pool where each thread modifies a unique section of the data buffer
 
@@ -217,8 +240,7 @@ class Recaster():
                 pass    # we have no follow-up to perform; this is just a join() across the threads
 
         # calculate the next hash AFTER we reconstitute a chunk
-        nextHash = hashlib.sha1(data).digest()
-
+        nextHash = self.hasher(data).digest()
         self.hashObj.update(nextHash)
 
         return data
