@@ -29,7 +29,7 @@ The script can also optionally be used to create snapshots, where each backup is
 
     backup-to-parts.py [-h] [-bs BLOCK_SIZE] [-ps PART_SIZE] [-k]
                        [-s SNAPSHOTS] [-u] [-l] [-f PASSPHRASE]
-                       [-o PASSPHRASE] source backup-root
+                       [-o PASSPHRASE] [-H LEVEL] source backup-root
 
 * source: the file or device to backup, e.g. `/dev/rdisk1s2` or `/dev/sda2`. Can also be a partition UUID when `-u` is specified.
 
@@ -55,6 +55,9 @@ Encrypted snapshots are consdiered "one-offs", and do not participate in increme
 Backups can be obfuscated using a custom algorithm instead of encrypted with something more formal.  Unlike backups encrypted with traditional algorithms, obfuscation guarantees a 1:1 byte pattern and size footprint with the source partition.  Potential advantages to this are documented in the code.<br><br>
 As with encrypted snapshots, obfuscated snapshots are also considered "one-offs", and do not participate in incremental backups.  The program will detect these snapshots during incremental backups, and ignore them.
 
+* `-H` `--hash`
+The SHA hash level the program should use if you enable `Fernet` or `Obfusctation`.  The default is 256 (i.e., SHA256), but you can explicitly specify 1, 384 or 512 depending upon your desired hardening amount. (SHA1 should be avoided--it has been deprecated since Google announced the first collision in 2017--but is included here for your discretionary use.)
+
 * `-u` `--uuid`
 Specifies that source is a partition UUID rather than a file or device identifier.
 
@@ -71,7 +74,8 @@ Displays usage information
 ### Usage for restoring:
 
     restore-from-parts.py [-h] [-bs BLOCK_SIZE] [-s START] [-v] [-u]
-                       [-f PASSPHRASE] [-o PASSPHRASE] snapshot-path destination
+                       [-f PASSPHRASE] [-o PASSPHRASE] [-H LEVEL]
+                       snapshot-path destination
 
 * snapshot-path: path to a folder containing all of the parts of a backup. When `-s` is non-zero when creating the backup, this is the path to a particular snapshot, otherwise it's the path to the backup root itself.
 
@@ -89,6 +93,9 @@ Restore a snapshot previously encrypted using Fernet.  This option is required i
 * `-c PASSPHRASE` `--clarify PASSPHRASE`
 Restore a snapshot previously obfuscated.<br><br>
 This option is _not_ required if you point the program at a snapshot folder that has detectable obfuscated parts.  Providing the passphrase will restore the partition to a state identical to a regular backup.  However, if you point the program at an obfuscated folder _without_ providing a passphrase, the program will "restore" the obfuscated binary data to the partition as-is without warning or complaint.  Your partition will not be directly usable (or even perhaps accessible).  See the code for the `Recast.obfuscate()` method for a more detailed description about this tactic.
+
+* `-H` `--hash`
+The SHA hash level the program should use if you enable `Fernet` or `Clarify`.  This should exactly match the level used to create the original backup, or your data will not be correctly transformed.
 
 * `-u` `--uuid`
 Specifies that destination is a partition UUID rather than a file or device identifier.
