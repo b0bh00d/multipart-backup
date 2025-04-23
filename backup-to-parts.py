@@ -302,13 +302,6 @@ def backup(args: argparse.Namespace) -> None:
         sys.stdout.write(f"{changedFiles + deletedFiles} changed")
     sys.stdout.write(f" files in {dest}.\n")
 
-def format_duration(elapsed: int) -> None:
-    hours = int(elapsed // 3600)
-    elapsed -= (hours * 3600)
-    minutes = int(elapsed // 60)
-    elapsed -= (minutes * 60)
-    return '%02dh%02dm%02ds' % (hours,minutes,elapsed)
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Iteratively backup file or device to multi-part file",
@@ -343,7 +336,7 @@ def main() -> int:
         d['blockSize'] = shared.humanReadableSizeToBytes(args.block_size)
         start = int(time.time())
         backup(args)
-        sys.stdout.write(f"Backup took {format_duration(int(time.time()) - start)}.\n")
+        sys.stdout.write(f"Backup took {shared.formatDuration(int(time.time()) - start)}.\n")
         return 0
     except (shared.DDError, ValueError, shared.BackupError) as e:
         sys.stderr.write(f'Error: {e}\n')

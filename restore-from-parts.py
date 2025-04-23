@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 import argparse
 import subprocess
 
@@ -144,7 +145,9 @@ def main() -> int:
         d['startPartIndex'] = int(args.start)
         d['blockSize'] = shared.humanReadableSizeToBytes(args.block_size)
 
+        start = int(time.time())
         restore(args)
+        sys.stdout.write(f"Restore took {shared.formatDuration(int(time.time()) - start)}.\n")
 
         return 0
     except (shared.DDError, shared.BackupDataError) as e:

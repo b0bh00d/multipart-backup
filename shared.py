@@ -45,6 +45,13 @@ class AverageSpeedCalculator():
     def averageSpeed(self) -> float:
         return self.currentAverageSpeed
 
+def formatDuration(elapsed: int) -> None:
+    hours = int(elapsed // 3600)
+    elapsed -= (hours * 3600)
+    minutes = int(elapsed // 60)
+    elapsed -= (minutes * 60)
+    return '%02dh%02dm%02ds' % (hours,minutes,elapsed)
+
 def outputStatus(value: str) -> None:
     """Prints a line to the console that overwrites the previous line, allowing for status updates."""
     if _outputStatusDontReplaceLine:
