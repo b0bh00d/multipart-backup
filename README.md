@@ -31,7 +31,7 @@ The script can also optionally be used to create snapshots, where each backup is
                        [-s SNAPSHOTS] [-u] [-l] [-f PASSPHRASE]
                        [-o PASSPHRASE] [-H LEVEL] source backup-root
 
-* source: the file or device to backup, e.g. `/dev/rdisk1s2` or `/dev/sda2`. Can also be a partition UUID when `-u` is specified.
+* source: the file or device to backup; e.g. `/dev/rdisk1s2` or `/dev/sda2`. Can also be a partition UUID when `-u` is specified; e.g. `573b9c48-b16b-41b9-aeb6-8a229b3bb9a7`
 
 * backup-root: the path to the folder that will contain the backup
 
@@ -67,7 +67,7 @@ Use soft links (i.e. symlinks) instead of hard links for incremental backups.
 * `-h` `--help`
 Displays usage information
 
-##### Example:
+##### Example (macOS):
 
     backup-to-parts.py -ps 50m -bs 1m -s 10 /dev/rdisk4s1 /Volumes/Backups/external-drive-backup/
 
@@ -103,7 +103,7 @@ Specifies that destination is a partition UUID rather than a file or device iden
 * `-h` `--help`
 Displays usage information
 
-##### Example:
+##### Example (macOS):
 
     restore-from-parts.py -bs 1m /Volumes/Backups/external-drive-backup/snapshot-2018-04-20-001337 /dev/rdisk4s1
 
@@ -117,6 +117,10 @@ It's much faster to specify a disk using `/dev/rdisk` rather than `/dev/disk`. T
 
 > `/dev/rdisk` nodes are character-special devices, but are "raw" in the BSD sense and force block-aligned I/O. They are closer to the physical disk than the buffer cache. `/dev/disk` nodes, on the other hand, are buffered block-special devices and are used primarily by the kernel's filesystem code.
 
+### Some Linux notes:
+
+Directly accessing devices (in /dev) requires root access, which means you must run these scripts under that user ID.
+
 ### Why this exists
 
 (see the [README in the original repository](https://github.com/briankendall/multipart-backup) for a detailed narrative as to why Brian created this.)
@@ -127,4 +131,4 @@ It's much faster to specify a disk using `/dev/rdisk` rather than `/dev/disk`. T
 
 - There's no progress indicator other than how many parts have been copied
 
-- No option for compression: I experimented early on with compressing each part of a backup using gzip, but it causes it to take a lot longer to perform the backup, and since my partitions are encrypted gzip didn't really save me any disk space anyway. So I settled instead of excluding parts that are totally blank. I may add an option later that allows using gzip.
+- No option for compression: I (Brian) experimented early on with compressing each part of a backup using gzip, but it causes it to take a lot longer to perform the backup, and since my partitions are encrypted, gzip didn't really save me any disk space anyway. So I settled instead on excluding parts that are totally blank. I may add an option later that allows using gzip.

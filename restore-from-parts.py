@@ -37,7 +37,7 @@ def checkPartsAndGetPartSize(backupPath: str, parts: List[str], blockSize: int) 
 
 def restore(args: argparse.Namespace) -> None:
     dest = shared.deviceIdentifierForSourceString(args.dest, args.uuid)
-    recaster = Recaster(args.clarify if args.clarify else args.fernet, hashlvl=args.hash)
+    recaster = Recaster(hashlvl=args.hash, passphrase=args.clarify if args.clarify else args.fernet)
 
     reconstitute = None
     parts = shared.partsInSnapshot(args.backup)
