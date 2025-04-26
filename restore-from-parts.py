@@ -125,7 +125,7 @@ def main() -> int:
     parser.add_argument('backup', help="Folder containing multi-part backup")
     parser.add_argument('dest', help="Destination file or device")
     parser.add_argument('-f', '--fernet', help='Passphrase for decrypting backups using Fernet.', type=str, default=None)
-    parser.add_argument('-c', '--clarify', help='Passphrase for clarifying backups using an obfuscation algorithm.', type=str, default=None)
+    parser.add_argument('-c', '--clarify', help='Passphrase for clarifying backups made using the obfuscation algorithm.', type=str, default=None)
     parser.add_argument('-bs', '--block-size', help='Block size for dd and comparing files. Uses same format for sizes '
                         'as dd. Defaults to 1MB.', type=str, default=str(1024*1024))
     parser.add_argument('-H', '--hash', type=int, default=256, help='SHA hash level to use (1, 256, 384, 512).')

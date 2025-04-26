@@ -309,7 +309,7 @@ def main() -> int:
     parser.add_argument('source', help="Source file, device identifier, or partition UUID")
     parser.add_argument('dest', help="Destination folder for multi-part backup")
     parser.add_argument('-f', '--fernet', help='Passphrase for encrypting backups using Fernet.', type=str, default=None)
-    parser.add_argument('-o', '--obfuscate', help='Passphrase for encrypting backups using an obfuscation algorithm.', type=str, default=None)
+    parser.add_argument('-o', '--obfuscate', help='Passphrase for encrypting backups using a custom obfuscation algorithm.', type=str, default=None)
     parser.add_argument('-bs', '--block-size', help='Block size for dd and comparing files. Uses same format for sizes '
                         'as dd. Defaults to 1 MB.', type=str, default=str(1024*1024))
     parser.add_argument('-ps', '--part-size', help='Size of each part of the backup. Uses same format for sizes as dd. '
