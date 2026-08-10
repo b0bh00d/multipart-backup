@@ -20,6 +20,9 @@ Then, when the script is run again and the backup is updated, only the parts con
 
 The script can also optionally be used to create snapshots, where each backup is contained within its own timestamped folder. Each time a new snapshot is made, the script hard links the contents of the previous snapshot folder into the new snapshot folder, and then the multi-part files are updated. (Similar to macOS's Time Machine feature.) That way, multiple snapshots of the partition may be kept around while still utilizing space efficiently.
 
+## (Why This Fork Exists)
+I forked this project from Brian's work to add security options to the backups--you'll notice this project provides new CLI options to support that.  I had a very specific purpose for using these security options; see the doc comment in the `recaster::obfuscate()` function for clarity.
+
 ### Requirements:
 
 - Python 3.x (tested with 3.12.3)
