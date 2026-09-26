@@ -138,7 +138,7 @@ class Recaster():
         import concurrent.futures
 
         with open(chunkPath, 'rb') as f:
-            data = f.read()
+            data: bytearray = bytearray(f.read())
 
         # our hash value starts out derived from the provided passphrase.  however,
         # each subsequent chunk provided adds its unique hash to this cumulative value,
@@ -162,13 +162,12 @@ class Recaster():
         if ln % chunk_size:
             thread_data.append((offset, ln % chunk_size))
 
-        def _xor(data: List[bytes], offset: int, size: int, hash: bytes) -> None:
+        def _xor(data: bytearray, offset: int, size: int, hash: bytes) -> None:
             o = 0
             ln = len(hash)
             while o < size:
                 ii = o + offset
-                b = data[ii]
-                data[ii] = b ^ hash[o % ln]
+                data[ii] ^= hash[o % ln]
                 o += 1
 
         hash = self.hashObj.digest()
@@ -207,7 +206,7 @@ class Recaster():
         import concurrent.futures
 
         with open(chunkPath, 'rb') as f:
-            data = f.read()
+            data: bytearray = bytearray(f.read())
 
         # run a thread pool where each thread modifies a unique section of the data buffer
 
@@ -224,13 +223,12 @@ class Recaster():
         if ln % chunk_size:
             thread_data.append((offset, ln % chunk_size))
 
-        def _xor(data: List[bytes], offset: int, size: int, hash: bytes) -> None:
+        def _xor(data: bytearray, offset: int, size: int, hash: bytes) -> None:
             o = 0
             ln = len(hash)
             while o < size:
                 ii = o + offset
-                b = data[ii]
-                data[ii] = b ^ hash[o % ln]
+                data[ii] ^= hash[o % ln]
                 o += 1
 
         hash = self.hashObj.digest()
@@ -243,4 +241,4 @@ class Recaster():
         nextHash = self.hasher(data).digest()
         self.hashObj.update(nextHash)
 
-        return data
+        return bytes(data)
