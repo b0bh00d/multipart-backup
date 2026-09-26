@@ -5,15 +5,14 @@ import sys
 import time
 import argparse
 import subprocess
+from turtle import back
 
 import shared
 from recaster import Recaster
 
-from typing import List
-
-def checkPartsAndGetPartSize(backupPath: str, parts: List[str], blockSize: int) -> None:
+def checkPartsAndGetPartSize(backupPath: str, parts: list[str], blockSize: int) -> int:
     """Checks to make sure all the parts in the given backup are a consistent size, and returns that size."""
-    backupPartSize = None
+    backupPartSize: int | None = None
 
     for i in range(len(parts)-1):
         part = parts[i]
@@ -31,9 +30,10 @@ def checkPartsAndGetPartSize(backupPath: str, parts: List[str], blockSize: int) 
 
             if partSize % blockSize != 0:
                 print(partSize, blockSize)
-                raise shared.BackupDataError('Parts in backup have a size that is not an integer multiple of the block size. '
-                                      'Please specify a compatible block size.')
+                raise shared.BackupDataError(
+'Parts in backup have a size that is not an integer multiple of the block size. Please specify a compatible block size.')
 
+    assert backupPartSize is not None
     return backupPartSize
 
 def restore(args: argparse.Namespace) -> None:

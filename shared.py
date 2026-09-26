@@ -6,8 +6,6 @@ import ctypes
 import platform
 import subprocess
 
-from typing import List
-
 _outputStatusLastSize = 0
 _outputStatusDontReplaceLine = False
 
@@ -27,7 +25,7 @@ class AverageSpeedCalculator():
     """Class for calculating average copy speed of several copy operations"""
     def __init__(self, maxSamples: int) -> None:
         self.startTime = None
-        self.currentAverageSpeed = None
+        self.currentAverageSpeed: float = 0.0
         self.maxSamples = maxSamples
         self.timingList = []
         self.bytesCopiedList = []
@@ -36,16 +34,17 @@ class AverageSpeedCalculator():
         self.startTime = time.time()
 
     def endOfCycle(self, bytesCopied: int) -> None:
+        assert self.startTime is not None
         self.timingList.append(time.time()-self.startTime)
         self.bytesCopiedList.append(bytesCopied)
         self.timingList = self.timingList[-self.maxSamples:]
         self.bytesCopiedList = self.bytesCopiedList[-self.maxSamples:]
-        self.currentAverageSpeed = sum(self.bytesCopiedList) / sum(self.timingList)
+        self.currentAverageSpeed: float = sum(self.bytesCopiedList) / sum(self.timingList)
 
     def averageSpeed(self) -> float:
         return self.currentAverageSpeed
 
-def formatDuration(elapsed: int) -> None:
+def formatDuration(elapsed: int) -> str:
     hours = int(elapsed // 3600)
     elapsed -= (hours * 3600)
     minutes = int(elapsed // 60)
@@ -55,7 +54,7 @@ def formatDuration(elapsed: int) -> None:
 def outputStatus(value: str) -> None:
     """Prints a line to the console that overwrites the previous line, allowing for status updates."""
     if _outputStatusDontReplaceLine:
-        sys.stdout.write(f'{value}\n')
+        _ = sys.stdout.write(f'{value}\n')
         return
 
     global _outputStatusLastSize
@@ -63,8 +62,8 @@ def outputStatus(value: str) -> None:
     if len(value) < _outputStatusLastSize:
         value = value + (' ' * (_outputStatusLastSize-len(value)))
 
-    sys.stdout.write(f'{value}\r')
-    sys.stdout.flush()
+    _ = sys.stdout.write(f'{value}\r')
+    _ = sys.stdout.flush()
     _outputStatusLastSize = len(value)
 
 def humanReadableSize(bytes: int) -> str:
@@ -112,7 +111,7 @@ def isEncryptedFile(filename: str) -> bool:
 def isObfuscatedFile(filename: str) -> bool:
     return filename.endswith('.obf') and filename[-12:-8].isdigit()
 
-def partsInSnapshot(dest: str, variant: str = None) -> List[str]:
+def partsInSnapshot(dest: str, variant: str | None = None) -> list[str]:
     match variant:
         case None:
             return sorted(list(filter(isPartFile, os.listdir(dest))))
@@ -120,6 +119,8 @@ def partsInSnapshot(dest: str, variant: str = None) -> List[str]:
             return sorted(list(filter(isEncryptedFile, os.listdir(dest))))
         case 'obfuscated':
             return sorted(list(filter(isObfuscatedFile, os.listdir(dest))))
+        case _:
+            pass
 
     return []
 
@@ -207,7 +208,7 @@ def findDiskDeviceIdentifierByUUID(uuidString: str) -> str | None:
 
 def isUUID(uuidString: str) -> bool:
     try:
-        uuid.UUID(uuidString)
+        _ = uuid.UUID(uuidString)
         return True
     except ValueError:
         return False

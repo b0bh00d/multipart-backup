@@ -11,8 +11,6 @@ import subprocess
 import shared
 from recaster import Recaster
 
-from typing import Tuple, List
-
 _nullBlock = '\0'
 
 def isFileAllZeros(path: str, blockSize: int) -> bool:
@@ -66,7 +64,7 @@ def newPartPathAtIndex(dest: str, index: int) -> str:
     yet been compared to an existing part to see if they're identical or if the new part contains all zeros"""
     return os.path.join(dest, f'part_{index:08d}.new')
 
-def copyPartToDisk(source: str, dest: str, partSize: int, blockSize: int, index: int, speedCalculator: shared.AverageSpeedCalculator) -> Tuple[str | None, int]:
+def copyPartToDisk(source: str, dest: str, partSize: int, blockSize: int, index: int, speedCalculator: shared.AverageSpeedCalculator) -> tuple[str | None, int]:
     """Copies source into dest in partSize chunks. Returns the path of the newly created part, or None if the part
     was within partSize-1 bytes of the end of source and there are no more parts to copy."""
     partBlockCount = partSize // blockSize
@@ -152,7 +150,7 @@ def isSnapshotDir(path: str) -> bool:
             # filter out snapshots that have obfuscation or encrypted files
             and os.path.exists(partName))
 
-def previousSnapshots(destRoot: str) -> List[str]:
+def previousSnapshots(destRoot: str) -> list[str]:
     return list(
             map(lambda x: os.path.join(destRoot, x),
                sorted(
@@ -167,7 +165,7 @@ def previousSnapshots(destRoot: str) -> List[str]:
             )
         )
 
-def findIncompleteSnapshot(snapshots: List[str]):
+def findIncompleteSnapshot(snapshots: list[str]):
     incompletes = list(filter(lambda x: os.path.basename(x) == inProgressSnapshotName(), snapshots))
 
     if len(incompletes) > 0:
@@ -200,11 +198,11 @@ def setupAndReturnDestination(destRoot: str, snapshotCount: int, incrBackup: boo
         incompleteSnapshot = findIncompleteSnapshot(prevs)
 
         if incompleteSnapshot is not None:
-            sys.stdout.write("NOTE: last snapshot is not complete! Will attempt to "
-                             "finish it...\n")
+            _ = sys.stdout.write(
+"NOTE: last snapshot is not complete! Will attempt to finish it...\n")
             dest = incompleteSnapshot
         elif len(prevs) > 0:
-            sys.stdout.write("Setting up new snapshot...\n")
+            _ = sys.stdout.write("Setting up new snapshot...\n")
             if incrBackup:
                 dest = createNewSnapshotWithLinksToOld(destRoot, prevs[-1], useSymLinks)
             else:
@@ -237,7 +235,7 @@ def removeOldSnapshots(destRoot: str, snapshotCount: int) -> None:
     snapshotsToRemove = prevs[:-snapshotCount]
 
     if len(snapshotsToRemove) > 0:
-        sys.stdout.write("Removing old snapshots...\n")
+        _ = sys.stdout.write("Removing old snapshots...\n")
 
         for oldSnapshot in snapshotsToRemove:
             for part in shared.partsInSnapshot(oldSnapshot):
