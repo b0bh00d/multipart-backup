@@ -40,14 +40,14 @@ def restore(args: argparse.Namespace) -> None:
     dest = shared.deviceIdentifierForSourceString(args.dest, args.uuid)
     recaster = Recaster(hashlvl=args.hash, passphrase=args.clarify if args.clarify else args.fernet)
 
+    obfuscated: bool = False
     reconstitute = None
     parts = shared.partsInSnapshot(args.backup)
     if len(parts) == 0:
         parts = shared.partsInSnapshot(args.backup, variant="obfuscated")
         if len(parts):
+            obfuscated = True
             sys.stdout.write(f"Found {len(parts)} obfuscation files.\n")
-            if args.clarify:
-                reconstitute = recaster.clarify
         else:
             parts = shared.partsInSnapshot(args.backup, variant="encrypted")
             if len(parts):
@@ -59,6 +59,15 @@ def restore(args: argparse.Namespace) -> None:
                     raise Exception('Encrypted files found in snapshot without invoking "fernet" decryption.')
     else:
         sys.stdout.write(f"Found {len(parts)} backup files.\n")
+
+    if args.clarify:
+        if not obfuscated:
+            print("Warning: Clarify specified on potentially clear data.")
+            ok: str = input("Are you sure you want to continue? (y/N) ")
+            if ok.lower() != 'y':
+                print("Aborting.")
+                sys.exit(0)
+        reconstitute = recaster.clarify
 
     backupPartSize = checkPartsAndGetPartSize(args.backup, parts, args.blockSize)
 
