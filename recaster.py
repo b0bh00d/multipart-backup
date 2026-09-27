@@ -6,6 +6,13 @@ import hashlib
 from typing import List
 from collections.abc import Callable
 
+def _xor_inplace(data: bytearray, hash: bytes) -> None:
+    """XOR data in place with a cyclically-repeating key, vectorized via translate()."""
+    ln = len(hash)
+    tables = [bytes(b ^ k for b in range(256)) for k in hash]
+    for p in range(ln):
+        data[p::ln] = data[p::ln].translate(tables[p])
+
 class Recaster():
     def __init__(self, hashlvl: int, passphrase: str | None = None):
         if passphrase:
@@ -135,8 +142,6 @@ class Recaster():
 
         Protege te.
         """
-        import concurrent.futures
-
         with open(chunkPath, 'rb') as f:
             data: bytearray = bytearray(f.read())
 
@@ -147,42 +152,8 @@ class Recaster():
         # the same order they were processed.
         nextHash = self.hasher(data).digest()
 
-        # run a thread pool where each thread modifies a unique section of the data buffer
-
-        workers = 10
-        ln = len(data)
-        chunk_size = ln // workers
-
-        thread_data = []
-        offset = 0
-        for _ in range(workers):
-            thread_data.append((offset, chunk_size))
-            offset += chunk_size
-
-        if ln % chunk_size:
-            thread_data.append((offset, ln % chunk_size))
-
-        def _xor(data: bytearray, offset: int, size: int, hash: bytes) -> None:
-            o = 0
-            ln = len(hash)
-            while o < size:
-                ii = o + offset
-                data[ii] ^= hash[o % ln]
-                o += 1
-
         hash = self.hashObj.digest()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(_xor, data, t[0], t[1], hash): t for t in thread_data}
-            for future in concurrent.futures.as_completed(futures):
-                pass    # we have no follow-up to perform; this is just a join() across the threads
-
-                # future_data = futures[future]
-                # try:
-                #     data = future.result()
-                # except Exception as exc:
-                #     print('%r generated an exception: %s' % (url, exc))
-                # else:
-                #     print('%r page is %d bytes' % (url, len(data)))
+        _xor_inplace(data, hash)
 
         path, filename = os.path.split(chunkPath)
         basename, ext = os.path.splitext(filename)
@@ -203,39 +174,11 @@ class Recaster():
         return True
 
     def clarify(self, chunkPath: str) -> bytes:
-        import concurrent.futures
-
         with open(chunkPath, 'rb') as f:
             data: bytearray = bytearray(f.read())
 
-        # run a thread pool where each thread modifies a unique section of the data buffer
-
-        workers = 10
-        ln = len(data)
-        chunk_size = ln // workers
-
-        thread_data = []
-        offset = 0
-        for _ in range(workers):
-            thread_data.append((offset, chunk_size))
-            offset += chunk_size
-
-        if ln % chunk_size:
-            thread_data.append((offset, ln % chunk_size))
-
-        def _xor(data: bytearray, offset: int, size: int, hash: bytes) -> None:
-            o = 0
-            ln = len(hash)
-            while o < size:
-                ii = o + offset
-                data[ii] ^= hash[o % ln]
-                o += 1
-
         hash = self.hashObj.digest()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(_xor, data, t[0], t[1], hash): t for t in thread_data}
-            for future in concurrent.futures.as_completed(futures):
-                pass    # we have no follow-up to perform; this is just a join() across the threads
+        _xor_inplace(data, hash)
 
         # calculate the next hash AFTER we reconstitute a chunk
         nextHash = self.hasher(data).digest()
